@@ -1,0 +1,66 @@
+name: Mirror
+
+on:
+  workflow_call:
+    inputs:
+      destination:
+        description: >-
+          SSH URL of the destination repository. When empty the whole job is
+          skipped, so repositories that do not mirror cost nothing.
+        type: string
+        required: false
+        default: ''
+      branches:
+        description: Branch glob to mirror, or "false" for none.
+        type: string
+        required: false
+        default: '*'
+      tags:
+        description: Tag glob to mirror, or "false" for none.
+        type: string
+        required: false
+        default: '*'
+      prune:
+        description: Delete matching refs on the destination that no longer exist here.
+        type: boolean
+        required: false
+        default: true
+      lfs:
+        description: Also transfer Git LFS objects.
+        type: boolean
+        required: false
+        default: false
+      dry-run:
+        description: Report what would happen without writing to the destination.
+        type: boolean
+        required: false
+        default: false
+      runs-on:
+        description: Runner label for the mirror job.
+        type: string
+        required: false
+        default: ubuntu-latest
+    secrets:
+      MIRROR_SSH_KEY:
+        description: Passphrase-less private SSH key allowed to push to the destination.
+        required: false
+
+jobs:
+  mirror:
+    if: inputs.destination != ''
+    runs-on: ${{ inputs.runs-on }}
+    permissions:
+      contents: read
+    concurrency:
+      group: mirror-${{ github.repository }}
+      cancel-in-progress: false
+    steps:
+      - uses: Holo-Org/.github/actions/mirror@main
+        with:
+          destination: ${{ inputs.destination }}
+          ssh-key: ${{ secrets.MIRROR_SSH_KEY }}
+          branches: ${{ inputs.branches }}
+          tags: ${{ inputs.tags }}
+          prune: ${{ inputs.prune }}
+          lfs: ${{ inputs.lfs }}
+          dry-run: ${{ inputs.dry-run }}
