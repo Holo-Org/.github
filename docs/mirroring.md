@@ -160,8 +160,15 @@ or a ruleset on the destination is blocking the force-push or the pruning.
 Either exempt the key's account there, or set `prune: false` and mirror only the
 branches that are writable.
 
-**`Could not determine the SSH host keys`** — the runner could not reach the
-destination host. Pass `known-hosts` explicitly when using the action directly.
+**`Could not determine the SSH host keys`** — the runner could reach neither
+GitHub's published key list nor the destination host itself. Pass `known-hosts`
+explicitly to pin them.
+
+Host keys are resolved in three steps: the `known-hosts` input if given, then
+GitHub's published list for `github.com`, then `ssh-keyscan`. A
+`Falling back to ssh-keyscan` notice means the published list was unreachable —
+usually the API rate limit, which is shared across everything running on that
+runner's IP — and is not in itself a problem.
 
 ## Limitations
 

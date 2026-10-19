@@ -106,19 +106,37 @@ key_file="$work/id"
 printf '%s\n' "$ssh_key" >"$key_file"
 chmod 600 "$key_file"
 
+kh_host=$host
+if [ -n "$port" ] && [ "$port" != 22 ]; then
+	kh_host="[$host]:$port"
+fi
+
+# Authenticated: unauthenticated calls are capped at 60/hour per IP, a quota
+# shared by every job running on the same hosted runner. The token is only sent
+# when it was issued by the host being asked.
+github_published_keys() {
+	local auth=()
+	[ "$server_url" = "https://github.com" ] && auth=(-H "Authorization: Bearer ${source_token}")
+	curl --fail --silent --location --retry 3 "${auth[@]}" \
+		-H "Accept: application/vnd.github+json" https://api.github.com/meta |
+		jq -r --arg h "$kh_host" '.ssh_keys[] | "\($h) \(.)"'
+}
+
 known_hosts_file="$work/known_hosts"
 if [ -n "$known_hosts_input" ]; then
 	printf '%s\n' "$known_hosts_input" >"$known_hosts_file"
-elif [ "$host" = "github.com" ]; then
-	# Preferred over ssh-keyscan, which trusts whatever answers on the network.
-	if ! curl --fail --silent --show-error --location --retry 3 https://api.github.com/meta |
-		jq -r --arg h "$host" '.ssh_keys[] | "\($h) \(.)"' >"$known_hosts_file"; then
-		warn "Could not read GitHub's published SSH host keys."
-	fi
 else
-	keyscan_args=()
-	[ -n "$port" ] && keyscan_args+=(-p "$port")
-	ssh-keyscan "${keyscan_args[@]}" "$host" >"$known_hosts_file" 2>/dev/null || true
+	# Published keys are preferred over ssh-keyscan, which trusts whatever
+	# answers on the network, but either beats failing the mirror outright.
+	if [ "$host" = "github.com" ]; then
+		github_published_keys >"$known_hosts_file" 2>/dev/null || true
+	fi
+	if [ ! -s "$known_hosts_file" ]; then
+		[ "$host" = "github.com" ] && notice "Falling back to ssh-keyscan for github.com's host keys."
+		keyscan_args=()
+		[ -n "$port" ] && keyscan_args+=(-p "$port")
+		ssh-keyscan "${keyscan_args[@]}" "$host" >"$known_hosts_file" 2>/dev/null || true
+	fi
 fi
 [ -s "$known_hosts_file" ] || fail "Could not determine the SSH host keys for '$host'. Pass them via the known-hosts input."
 
