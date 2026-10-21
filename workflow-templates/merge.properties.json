@@ -1,0 +1,6 @@
+{
+  "name": "Merge on /merge",
+  "description": "Squash-merge a pull request when someone with write access comments /merge, building the commit message from the pull request. Needs the organisation's automation app and a locked default branch.",
+  "iconName": "octicon git-merge",
+  "categories": ["Automation"]
+}

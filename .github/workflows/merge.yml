@@ -1,0 +1,44 @@
+name: Merge
+
+on:
+  workflow_call:
+    inputs:
+      pull-request:
+        description: >-
+          Pull request to merge. Only needed when the caller is not an
+          issue_comment event, such as a manual workflow_dispatch fallback.
+        type: string
+        required: false
+        default: ''
+    secrets:
+      MERGE_APP_PRIVATE_KEY:
+        description: >-
+          Private key of the organisation's automation app. Its client id comes
+          from the MERGE_APP_CLIENT_ID organisation variable, which a called
+          workflow reads for itself.
+        required: true
+
+jobs:
+  merge:
+    if: >-
+      github.event_name != 'issue_comment' ||
+      (github.event.issue.pull_request != null &&
+       startsWith(github.event.comment.body, '/merge'))
+    runs-on: ubuntu-24.04
+    permissions: {}
+    concurrency:
+      group: merge-${{ github.repository }}-${{ github.event.issue.number }}${{ inputs.pull-request }}
+      cancel-in-progress: false
+    steps:
+      - name: Mint an app token
+        id: token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ vars.MERGE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.MERGE_APP_PRIVATE_KEY }}
+
+      - name: Merge
+        uses: Holo-Org/.github/actions/merge@main
+        with:
+          token: ${{ steps.token.outputs.token }}
+          pull-request: ${{ inputs.pull-request != '' && inputs.pull-request || github.event.issue.number }}

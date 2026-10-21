@@ -1,0 +1,35 @@
+name: Merge a pull request
+description: >-
+  Squash-merges a pull request, composing the commit from its title and its
+  Summary section, and refusing anything that breaks the convention.
+
+inputs:
+  token:
+    description: >-
+      Installation token for the organisation's automation app. GITHUB_TOKEN
+      will not do: merges made with it trigger no further workflows, so no
+      release could follow one.
+    required: true
+  pull-request:
+    description: >-
+      Number of the pull request to merge. Defaults to the one whose comment
+      triggered the run.
+    required: false
+    default: ${{ github.event.issue.number }}
+
+runs:
+  using: composite
+  steps:
+    - name: Check the pull request and merge it
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+        GH_REPO: ${{ github.repository }}
+        PR: ${{ inputs.pull-request }}
+        # The comment body is attacker-controlled: anybody can comment on a
+        # public pull request. It reaches the script through the environment,
+        # never through ${{ }}, which would make it shell source.
+        COMMENT_ID: ${{ github.event.comment.id }}
+        COMMENT_BODY: ${{ github.event.comment.body }}
+        ACTOR: ${{ github.event.comment.user.login || github.actor }}
+      run: bash "$GITHUB_ACTION_PATH/merge.sh"

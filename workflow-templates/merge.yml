@@ -1,0 +1,10 @@
+name: Merge
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  merge:
+    uses: Holo-Org/.github/.github/workflows/merge.yml@main
+    secrets: inherit
