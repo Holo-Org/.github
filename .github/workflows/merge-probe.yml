@@ -1,0 +1,76 @@
+name: Merge probe
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+permissions: {}
+
+jobs:
+  probe:
+    if: github.base_ref == 'probe-base'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Mint an app token
+        id: token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ secrets.MERGE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.MERGE_APP_PRIVATE_KEY }}
+
+      - name: What a pre-flight can see, then merge with bypass_rules
+        env:
+          GH_TOKEN: ${{ steps.token.outputs.token }}
+          PR: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -uo pipefail
+
+          echo "::group::pull request mergeability"
+          gh api "repos/$GITHUB_REPOSITORY/pulls/$PR" \
+            --jq '{mergeable, mergeable_state, rebaseable, draft}'
+          echo "::endgroup::"
+
+          echo "::group::rules in force on the base branch"
+          gh api "repos/$GITHUB_REPOSITORY/rules/branches/probe-base" \
+            --jq '[.[] | {type, ruleset_id, parameters}]'
+          echo "::endgroup::"
+
+          echo "::group::combined status and check runs on the head"
+          gh api "repos/$GITHUB_REPOSITORY/commits/$HEAD_SHA/status" \
+            --jq '{state, statuses: [.statuses[] | {context, state}]}'
+          gh api "repos/$GITHUB_REPOSITORY/commits/$HEAD_SHA/check-runs" \
+            --jq '{total_count, runs: [.check_runs[] | {name, status, conclusion}]}'
+          echo "::endgroup::"
+
+          echo "::group::merge-async with bypass_rules=true"
+          out="$(jq -n --arg sha "$HEAD_SHA" \
+            '{sha: $sha,
+              merge_method: "squash",
+              merge_action: "direct_merge",
+              commit_title: "probe: try to merge past a required status check",
+              commit_message: "Should be refused: the app bypasses the lock, not the checks.",
+              bypass_rules: true}' |
+            gh api -X PUT "repos/$GITHUB_REPOSITORY/pulls/$PR/merge-async" --input - 2>&1)"
+          echo "$out"
+
+          uuid="$(jq -r '.details.uuid // empty' <<<"$out" 2>/dev/null)"
+          status=""
+          if [ -n "$uuid" ]; then
+            for _ in $(seq 1 12); do
+              sleep 3
+              poll="$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR/merge-async/$uuid" 2>&1)"
+              echo "$poll"
+              status="$(jq -r '.status // empty' <<<"$poll" 2>/dev/null)"
+              case "$status" in
+                merged | failed) break ;;
+              esac
+            done
+          fi
+          echo "::endgroup::"
+
+          if [ "$status" = merged ]; then
+            echo "RESULT: UNSAFE - bypass_rules=true merged past a required status check"
+          else
+            echo "RESULT: SAFE - the required status check still refused the merge"
+          fi
