@@ -22,6 +22,8 @@ env:
   ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
   SHELLCHECK_VERSION: 0.11.0
   SHELLCHECK_SHA256: 8c3be12b05d5c177a04c29e3c78ce89ac86f1595681cab149b65b97c4e227198
+  SHFMT_VERSION: 3.14.1
+  SHFMT_SHA256: 76e77641faa025814b77f153b29796b8e6fa2fca03e0c76a691608b86c7ea7bf
 
 jobs:
   lint:
@@ -50,17 +52,77 @@ jobs:
           tar -xJf shellcheck.tar.xz
           mv "shellcheck-v${SHELLCHECK_VERSION}/shellcheck" "$bin/shellcheck"
 
+          fetch "https://github.com/mvdan/sh/releases/download/v${SHFMT_VERSION}/shfmt_v${SHFMT_VERSION}_linux_amd64" \
+            "$SHFMT_SHA256" "$bin/shfmt"
+          chmod +x "$bin/shfmt"
+
           printf '%s\n' "$bin" >>"$GITHUB_PATH"
 
       - name: Report versions
         run: |
           actionlint --version | head -1
           shellcheck --version | grep version:
+          shfmt --version
 
       - name: Lint workflows
         run: |
           actionlint -color -shellcheck "$(command -v shellcheck)" \
             .github/workflows/*.yml workflow-templates/*.yml
+
+      - name: Lint shell
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          scripts=(actions/*/*.sh)
+          if [ "${#scripts[@]}" -eq 0 ]; then
+            echo "no shell scripts to lint"
+            exit 0
+          fi
+          shellcheck -s bash "${scripts[@]}"
+          shfmt -d "${scripts[@]}"
+
+      - name: Run the actions' unit tests
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          status=0
+          for test in actions/*/*.test.sh; do
+            echo "::group::$test"
+            bash "$test" || status=1
+            echo "::endgroup::"
+          done
+          exit "$status"
+
+      - name: Validate action metadata
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          status=0
+          for action in actions/*/action.yml; do
+            if ! yq -e '.' "$action" >/dev/null 2>&1; then
+              echo "::error file=$action::not valid YAML"
+              status=1
+              continue
+            fi
+            for field in name description; do
+              if [ -z "$(yq -r ".${field} // \"\"" "$action")" ]; then
+                echo "::error file=$action::missing required field '$field'"
+                status=1
+              fi
+            done
+            if [ -z "$(yq -r '.runs.using // ""' "$action")" ]; then
+              echo "::error file=$action::missing runs.using"
+              status=1
+            fi
+            while IFS= read -r input; do
+              [ -n "$input" ] || continue
+              if [ -z "$(yq -r ".inputs.\"${input}\".description // \"\"" "$action")" ]; then
+                echo "::error file=$action::input '$input' has no description"
+                status=1
+              fi
+            done < <(yq -r '.inputs // {} | keys | .[]' "$action")
+          done
+          exit "$status"
 
       - name: Validate starter workflow metadata
         run: |
@@ -92,5 +154,45 @@ jobs:
               echo "::error file=$props::no $(basename "$wf") alongside it"
               status=1
             fi
+          done
+          exit "$status"
+
+      - name: Validate ruleset definitions
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          status=0
+          for rs in rulesets/*.json; do
+            if ! jq -e '.' "$rs" >/dev/null 2>&1; then
+              echo "::error file=$rs::not valid JSON"
+              status=1
+              continue
+            fi
+            for field in name target enforcement rules; do
+              if [ "$(jq -r --arg f "$field" '.[$f] // empty | type' "$rs")" = "" ]; then
+                echo "::error file=$rs::missing required field '$field'"
+                status=1
+              fi
+            done
+            case "$(jq -r '.target // ""' "$rs")" in
+              branch | tag | push | repository) ;;
+              *) echo "::error file=$rs::target must be branch, tag, push or repository"
+                 status=1 ;;
+            esac
+            if [ "$(jq -r '.rules | length' "$rs")" = 0 ]; then
+              echo "::error file=$rs::no rules"
+              status=1
+            fi
+            while IFS= read -r rule; do
+              [ -n "$rule" ] || continue
+              echo "::error file=$rs::rule has no 'type'"
+              status=1
+            done < <(jq -c '.rules[] | select(has("type") | not)' "$rs")
+            while IFS= read -r actor; do
+              [ -n "$actor" ] || continue
+              echo "::error file=$rs::bypass actor missing actor_type or bypass_mode: $actor"
+              status=1
+            done < <(jq -c '.bypass_actors // [] | .[]
+                            | select((has("actor_type") and has("bypass_mode")) | not)' "$rs")
           done
           exit "$status"
