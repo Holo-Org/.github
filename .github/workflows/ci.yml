@@ -1,0 +1,141 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  ACTIONLINT_VERSION: 1.7.12
+  ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+  SHFMT_VERSION: 3.14.1
+  SHFMT_SHA256: 76e77641faa025814b77f153b29796b8e6fa2fca03e0c76a691608b86c7ea7bf
+  SHELLCHECK_VERSION: 0.11.0
+  SHELLCHECK_SHA256: 8c3be12b05d5c177a04c29e3c78ce89ac86f1595681cab149b65b97c4e227198
+
+jobs:
+  lint:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install linters
+        run: |
+          set -euo pipefail
+          bin="$RUNNER_TEMP/bin"
+          mkdir -p "$bin"
+          cd "$RUNNER_TEMP"
+
+          fetch() {
+            curl --fail --silent --show-error --location --retry 3 -o "$3" "$1"
+            printf '%s  %s\n' "$2" "$3" | sha256sum --check --quiet
+          }
+
+          fetch "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz" \
+            "$ACTIONLINT_SHA256" actionlint.tar.gz
+          tar -xzf actionlint.tar.gz -C "$bin" actionlint
+
+          fetch "https://github.com/mvdan/sh/releases/download/v${SHFMT_VERSION}/shfmt_v${SHFMT_VERSION}_linux_amd64" \
+            "$SHFMT_SHA256" "$bin/shfmt"
+          chmod +x "$bin/shfmt"
+
+          fetch "https://github.com/koalaman/shellcheck/releases/download/v${SHELLCHECK_VERSION}/shellcheck-v${SHELLCHECK_VERSION}.linux.x86_64.tar.xz" \
+            "$SHELLCHECK_SHA256" shellcheck.tar.xz
+          tar -xJf shellcheck.tar.xz
+          mv "shellcheck-v${SHELLCHECK_VERSION}/shellcheck" "$bin/shellcheck"
+
+          printf '%s\n' "$bin" >>"$GITHUB_PATH"
+
+      - name: Report versions
+        run: |
+          actionlint --version | head -1
+          shfmt --version
+          shellcheck --version | grep version:
+          yq --version
+
+      - name: Lint workflows
+        run: |
+          actionlint -color -shellcheck "$(command -v shellcheck)" \
+            .github/workflows/*.yml workflow-templates/*.yml
+
+      - name: Lint shell
+        run: |
+          set -euo pipefail
+          shellcheck -s bash actions/mirror/mirror.sh
+          shfmt -d actions/mirror/mirror.sh
+
+      - name: Validate action metadata
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          status=0
+          for action in actions/*/action.yml; do
+            if ! yq -e '.' "$action" >/dev/null 2>&1; then
+              echo "::error file=$action::not valid YAML"
+              status=1
+              continue
+            fi
+            for field in name description; do
+              if [ -z "$(yq -r ".${field} // \"\"" "$action")" ]; then
+                echo "::error file=$action::missing required field '$field'"
+                status=1
+              fi
+            done
+            if [ -z "$(yq -r '.runs.using // ""' "$action")" ]; then
+              echo "::error file=$action::missing runs.using"
+              status=1
+            fi
+            while IFS= read -r input; do
+              [ -n "$input" ] || continue
+              if [ -z "$(yq -r ".inputs.\"${input}\".description // \"\"" "$action")" ]; then
+                echo "::error file=$action::input '$input' has no description"
+                status=1
+              fi
+            done < <(yq -r '.inputs // {} | keys | .[]' "$action")
+          done
+          exit "$status"
+
+      - name: Validate starter workflow metadata
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          status=0
+          for wf in workflow-templates/*.yml; do
+            props="${wf%.yml}.properties.json"
+            if [ ! -f "$props" ]; then
+              echo "::error file=$wf::no $(basename "$props") alongside it"
+              status=1
+              continue
+            fi
+            if ! jq -e '.' "$props" >/dev/null 2>&1; then
+              echo "::error file=$props::not valid JSON"
+              status=1
+              continue
+            fi
+            for field in name description; do
+              if [ -z "$(jq -r --arg f "$field" '.[$f] // empty' "$props")" ]; then
+                echo "::error file=$props::missing required field '$field'"
+                status=1
+              fi
+            done
+          done
+          for props in workflow-templates/*.properties.json; do
+            wf="${props%.properties.json}.yml"
+            if [ ! -f "$wf" ]; then
+              echo "::error file=$props::no $(basename "$wf") alongside it"
+              status=1
+            fi
+          done
+          exit "$status"
