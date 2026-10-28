@@ -1,0 +1,26 @@
+name: Vars caller
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  gate:
+    if: github.head_ref == 'probe-vars'
+    runs-on: ubuntu-24.04
+    permissions: {}
+    steps:
+      - name: Report what the caller can see
+        env:
+          CLIENT_ID: ${{ vars.MERGE_APP_CLIENT_ID }}
+        run: |
+          set -euo pipefail
+          if [ -n "$CLIENT_ID" ]; then
+            echo "CALLER: vars resolve here too ($CLIENT_ID)"
+          else
+            echo "CALLER: vars are empty even in the caller"
+          fi
+
+  call:
+    if: github.head_ref == 'probe-vars'
+    uses: Holo-Org/.github/.github/workflows/vars-callee.yml@probe-vars

@@ -1,0 +1,22 @@
+name: Vars callee
+
+on:
+  workflow_call:
+
+jobs:
+  report:
+    runs-on: ubuntu-24.04
+    permissions: {}
+    steps:
+      - name: Report what the called workflow can see
+        env:
+          CLIENT_ID: ${{ vars.MERGE_APP_CLIENT_ID }}
+          APP_ID: ${{ vars.MERGE_APP_ID }}
+        run: |
+          set -euo pipefail
+          echo "github.repository = $GITHUB_REPOSITORY"
+          if [ -n "$CLIENT_ID" ]; then
+            echo "RESULT: vars DO resolve in a called workflow (client id $CLIENT_ID, app id $APP_ID)"
+          else
+            echo "RESULT: vars are EMPTY in a called workflow - they must be passed as inputs"
+          fi
