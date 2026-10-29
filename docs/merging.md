@@ -165,8 +165,7 @@ status that never turns green will block every merge in that repository.
   which is the only one that will touch a stack, merges every layer at once and
   puts the one supplied message on every resulting commit. A chain of ordinary
   pull requests is not a stack and merges normally.
-- **The wiring has not been exercised end to end.** The composition is unit
-  tested and the merge mechanism was measured against a locked branch, but
-  because `issue_comment` only fires for workflows already on the default
-  branch, the trigger, the reactions and the refusal comments cannot be tried
-  until this is merged. Treat the first live `/merge` as the test.
+- **A pull request whose own branch changes the command is awkward to test.**
+  `issue_comment` fires for the copy of the workflow on the default branch, so
+  a change to `/merge` itself cannot be exercised by commenting on the pull
+  request that makes it. Merge it, then try the next one.
