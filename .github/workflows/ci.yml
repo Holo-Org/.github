@@ -63,6 +63,7 @@ jobs:
           actionlint --version | head -1
           shellcheck --version | grep version:
           shfmt --version
+          jq --version
 
       - name: Lint workflows
         run: |
