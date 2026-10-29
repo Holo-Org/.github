@@ -1,0 +1,79 @@
+name: Stack probe
+
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review]
+
+permissions: {}
+
+jobs:
+  probe:
+    if: github.base_ref == 'probe-base'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Mint an app token
+        id: token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ vars.MERGE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.MERGE_APP_PRIVATE_KEY }}
+
+      - name: Merge the bottom of the stack into a locked branch
+        env:
+          GH_TOKEN: ${{ steps.token.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -uo pipefail
+          set +e
+
+          echo "::group::is this really a stack?"
+          gh api "repos/$GH_REPO/pulls/$PR" --jq '{number, base: .base.ref, stack}'
+          echo "::endgroup::"
+
+          echo "::group::gh pr merge --admin on a stacked pull request"
+          out="$(gh pr merge "$PR" --squash --admin \
+            --subject "probe: merge the bottom of a stack with gh" \
+            --body "Does gh route a stacked PR through stack merge?" \
+            --match-head-commit "$HEAD_SHA" 2>&1)"
+          echo "exit=$?"
+          echo "$out"
+          echo "::endgroup::"
+
+          if gh api "repos/$GH_REPO/pulls/$PR" --jq '.merged' | grep -q true; then
+            echo "RESULT-GH: gh pr merge --admin MERGED a stacked pull request"
+            exit 0
+          fi
+
+          echo "::group::merge-async with bypass_rules on the bottom of the stack"
+          out="$(jq -n --arg sha "$HEAD_SHA" \
+            '{sha: $sha, merge_method: "squash", merge_action: "direct_merge",
+              commit_title: "probe: merge the bottom of a stack",
+              commit_message: "Tests merge-async with bypass_rules on a stacked pull request.",
+              bypass_rules: true}' |
+            gh api -X PUT "repos/$GH_REPO/pulls/$PR/merge-async" --input - 2>&1)"
+          echo "exit=$?"
+          echo "$out"
+
+          uuid="$(jq -r '.details.uuid // empty' <<<"$out" 2>/dev/null)"
+          status=""
+          if [ -n "$uuid" ]; then
+            for _ in $(seq 1 15); do
+              sleep 3
+              poll="$(gh api "repos/$GH_REPO/pulls/$PR/merge-async/$uuid" 2>&1)"
+              echo "$poll"
+              status="$(jq -r '.status // empty' <<<"$poll" 2>/dev/null)"
+              case "$status" in merged | failed | enqueued) break ;; esac
+            done
+          fi
+          echo "::endgroup::"
+
+          echo "RESULT-ASYNC: status=${status:-none}"
+
+          echo "::group::what happened to the stack"
+          gh api "repos/$GH_REPO/pulls?state=all&per_page=5" \
+            --jq '[.[] | {number, base: .base.ref, merged: .merged_at != null, stack: .stack}]'
+          gh api "repos/$GH_REPO/commits?sha=probe-base&per_page=3" \
+            --jq '[.[] | {sha: .sha[0:8], message: .commit.message}]'
+          echo "::endgroup::"
