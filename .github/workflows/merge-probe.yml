@@ -1,0 +1,67 @@
+name: Merge probe
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+permissions: {}
+
+jobs:
+  probe:
+    if: github.base_ref == 'probe-base'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Mint an app token
+        id: token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ vars.MERGE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.MERGE_APP_PRIVATE_KEY }}
+
+      - name: Try gh pr merge, plain then with --admin
+        env:
+          GH_TOKEN: ${{ steps.token.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -uo pipefail
+          set +e
+
+          echo "::group::rules in force"
+          gh api "repos/$GH_REPO/rules/branches/probe-base" --jq '[.[].type]'
+          echo "::endgroup::"
+
+          echo "::group::plain gh pr merge --squash"
+          out="$(gh pr merge "$PR" --squash \
+            --subject "probe: merge through gh pr merge" \
+            --body "Plain attempt, no --admin." \
+            --match-head-commit "$HEAD_SHA" 2>&1)"
+          code=$?
+          true
+          echo "exit=$code"
+          echo "$out"
+          echo "::endgroup::"
+
+          if [ "$code" = 0 ]; then
+            echo "RESULT-PLAIN: merged without --admin"
+            exit 0
+          fi
+
+          echo "::group::gh pr merge --squash --admin"
+          out="$(gh pr merge "$PR" --squash --admin \
+            --subject "probe: merge through gh pr merge --admin" \
+            --body "Admin attempt." \
+            --match-head-commit "$HEAD_SHA" 2>&1)"
+          code=$?
+          echo "exit=$code"
+          echo "$out"
+          echo "::endgroup::"
+
+          if [ "$code" = 0 ]; then
+            echo "RESULT-ADMIN: --admin MERGED"
+            gh api "repos/$GH_REPO/commits?sha=probe-base&per_page=1" \
+              --jq '.[] | {message: .commit.message, verified: .commit.verification.verified}'
+          else
+            echo "RESULT-ADMIN: --admin REFUSED"
+          fi
