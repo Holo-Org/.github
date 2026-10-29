@@ -1,0 +1,12 @@
+# This repository merges the same way the rest of the organisation does. The
+# reusable workflow it calls lives next door in merge.yml.
+name: Merge command
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  merge:
+    uses: Holo-Org/.github/.github/workflows/merge.yml@main
+    secrets: inherit
