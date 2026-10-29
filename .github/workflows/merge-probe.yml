@@ -1,0 +1,72 @@
+name: Stack probe
+
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review]
+
+permissions: {}
+
+jobs:
+  probe:
+    if: github.base_ref == 'probe-base'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Mint an app token
+        id: token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ vars.MERGE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.MERGE_APP_PRIVATE_KEY }}
+
+      - name: Merge only the bottom layer, then see what landed
+        env:
+          GH_TOKEN: ${{ steps.token.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -uo pipefail
+          set +e
+
+          snapshot() {
+            echo "--- $1"
+            echo "probe-base tip and history:"
+            gh api "repos/$GH_REPO/commits?sha=probe-base&per_page=4" \
+              --jq '[.[] | {sha: .sha[0:8], msg: (.commit.message | split("\n")[0]), files_hint: .sha[0:8]}]'
+            echo "probe-bottom tip:"
+            gh api "repos/$GH_REPO/git/ref/heads/probe-bottom" --jq '.object.sha[0:8]' 2>&1
+            echo "pull requests:"
+            gh api "repos/$GH_REPO/pulls?state=all&per_page=4" \
+              --jq '[.[] | select(.number >= 7) | {n: .number, base: .base.ref, merged: (.merged_at != null), pos: .stack.position}]'
+          }
+
+          snapshot "BEFORE"
+
+          echo "::group::merge-async on the bottom layer only"
+          out="$(jq -n --arg sha "$HEAD_SHA" \
+            '{sha: $sha, merge_method: "squash", merge_action: "direct_merge",
+              commit_title: "probe: the bottom layer only",
+              commit_message: "If this message appears twice, the stack merged as one.",
+              bypass_rules: true}' |
+            gh api -X PUT "repos/$GH_REPO/pulls/$PR/merge-async" --input - 2>&1)"
+          echo "$out"
+          uuid="$(jq -r '.details.uuid // empty' <<<"$out" 2>/dev/null)"
+          if [ -n "$uuid" ]; then
+            for _ in $(seq 1 15); do
+              sleep 3
+              poll="$(gh api "repos/$GH_REPO/pulls/$PR/merge-async/$uuid" 2>&1)"
+              st="$(jq -r '.status // empty' <<<"$poll" 2>/dev/null)"
+              echo "poll: $st  $(jq -rc '.details.message // empty' <<<"$poll" 2>/dev/null)"
+              case "$st" in merged | failed | enqueued) break ;; esac
+            done
+          fi
+          echo "::endgroup::"
+
+          echo "waiting 25s for GitHub to finish restacking"
+          sleep 25
+          snapshot "AFTER"
+
+          echo "::group::full message of every commit now on probe-base"
+          gh api "repos/$GH_REPO/commits?sha=probe-base&per_page=4" \
+            --jq '.[] | "=== \(.sha[0:8])\n\(.commit.message)"'
+          echo "::endgroup::"
