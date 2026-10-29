@@ -142,6 +142,11 @@ two-digit pull request number but not a four-digit one.
 not start with the word `/merge`. `/merged` and `/merge-please` are ignored
 deliberately.
 
+**Skipped runs after every comment.** Every comment on a pull request raises an
+`issue_comment` event, so review bots that comment on each one produce a run
+that the job's condition skips immediately. A skipped job costs no minutes and
+never mints a token, so this is working as intended rather than noise to fix.
+
 **`/merge` is for people with write access.** The commenter is not a
 collaborator with push rights on that repository. Organisation membership is
 not enough.
