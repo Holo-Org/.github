@@ -1,7 +1,7 @@
 # Mirroring a repository
 
-Pushes every branch and tag of a repository in this organisation to a second Git
-remote over SSH, keeping the destination an exact copy.
+Pushes every branch, tag and Git LFS object of a repository in this organisation
+to a GitHub repository over SSH, keeping the destination an exact copy.
 
 A repository mirrors only once a `MIRROR_URL` variable is set on it. Everywhere
 else the workflow is skipped, so the stub is safe to add anywhere.
@@ -96,57 +96,32 @@ the repository.
 ## What gets mirrored
 
 Every branch and every tag, force-pushed, with refs that no longer exist here
-deleted on the destination. Nothing else is touched: pruning is limited to the
-ref patterns being mirrored, so unrelated namespaces on the destination survive.
+deleted on the destination, plus every Git LFS object they reference. Nothing
+else is touched: pruning is limited to branches and tags, so unrelated
+namespaces on the destination survive.
 
-Not mirrored: pull requests, issues, releases, wikis, settings, and — unless
-`lfs: true` is passed — Git LFS objects.
+Not mirrored: pull requests, issues, releases, wikis and settings.
 
-If the source repository has no branches and no tags, the run stops without
-touching the destination rather than emptying it.
+## LFS bandwidth
 
-## Options
+Every LFS download from this organisation counts against its monthly LFS
+bandwidth quota, Actions downloads included. To keep that to new objects only,
+the job keeps the LFS objects it has already downloaded in the repository's
+Actions cache and restores them on the next run. A cache saved by a run on
+another branch is not visible to runs on the default branch, so objects first
+pushed on a feature branch are downloaded once more after merging.
 
-Pass these to the reusable workflow under `with:`.
-
-- `branches` — branch glob relative to `refs/heads`, or `false` for none.
-  Defaults to `*`.
-- `tags` — tag glob relative to `refs/tags`, or `false` for none. Defaults to `*`.
-- `prune` — delete matching refs missing from the source. Defaults to `true`.
-- `lfs` — also transfer LFS objects. Defaults to `false`.
-- `dry-run` — resolve everything and report, writing nothing. Defaults to `false`.
-- `runs-on` — runner label. Defaults to `ubuntu-latest`.
-
-For example, to mirror only `main` and leave everything else on the destination
-alone:
-
-```yaml
-with:
-  destination: ${{ vars.MIRROR_URL }}
-  branches: main
-  tags: 'false'
-  prune: false
-```
-
-## Using the action directly
-
-For mirroring as one step of a larger workflow:
-
-```yaml
-- uses: Holo-Org/.github/actions/mirror@main
-  with:
-    destination: ${{ vars.MIRROR_URL }}
-    ssh-key: ${{ secrets.MIRROR_SSH_KEY }}
-```
-
-It needs no checkout — it fetches the source itself — and exposes `mirrored`,
-`branches` and `tags` as outputs.
+On the other side, the objects pushed count against the destination owner's LFS
+storage quota.
 
 ## Troubleshooting
 
 **The job is skipped.** `MIRROR_URL` is unset or empty on that repository. Note
 that a variable and a secret of the same name are different things; this one is a
 variable.
+
+**`MIRROR_SSH_KEY is not available to this repository`** — the organisation
+secret exists but this repository is not in its access list.
 
 **`ERROR: Permission to … denied to …`** — the key's account has no write access
 to the destination, or the key is not SSO-authorised for the destination's
@@ -157,22 +132,4 @@ it has a passphrase.
 
 **`protected branch hook declined` / `refusing to delete`** — branch protection
 or a ruleset on the destination is blocking the force-push or the pruning.
-Either exempt the key's account there, or set `prune: false` and mirror only the
-branches that are writable.
-
-**`Could not determine the SSH host keys`** — the runner could reach neither
-GitHub's published key list nor the destination host itself. Pass `known-hosts`
-explicitly to pin them.
-
-Host keys are resolved in three steps: the `known-hosts` input if given, then
-GitHub's published list for `github.com`, then `ssh-keyscan`. A
-`Falling back to ssh-keyscan` notice means the published list was unreachable —
-usually the API rate limit, which is shared across everything running on that
-runner's IP — and is not in itself a problem.
-
-## Limitations
-
-- The LFS path is implemented but has not been exercised against a real
-  LFS-backed repository; treat it as unverified.
-- A repository whose default branch is protected on the destination cannot be
-  mirrored with `prune: true` unless the key's account bypasses the protection.
+Exempt the key's account there.

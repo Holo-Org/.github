@@ -5,41 +5,11 @@ on:
     inputs:
       destination:
         description: >-
-          SSH URL of the destination repository. When empty the whole job is
-          skipped, so repositories that do not mirror cost nothing.
+          SSH URL of the destination repository. When empty the job is skipped,
+          so repositories that do not mirror cost nothing.
         type: string
         required: false
         default: ''
-      branches:
-        description: Branch glob to mirror, or "false" for none.
-        type: string
-        required: false
-        default: '*'
-      tags:
-        description: Tag glob to mirror, or "false" for none.
-        type: string
-        required: false
-        default: '*'
-      prune:
-        description: Delete matching refs on the destination that no longer exist here.
-        type: boolean
-        required: false
-        default: true
-      lfs:
-        description: Also transfer Git LFS objects.
-        type: boolean
-        required: false
-        default: false
-      dry-run:
-        description: Report what would happen without writing to the destination.
-        type: boolean
-        required: false
-        default: false
-      runs-on:
-        description: Runner label for the mirror job.
-        type: string
-        required: false
-        default: ubuntu-latest
     secrets:
       MIRROR_SSH_KEY:
         description: Passphrase-less private SSH key allowed to push to the destination.
@@ -48,19 +18,58 @@ on:
 jobs:
   mirror:
     if: inputs.destination != ''
-    runs-on: ${{ inputs.runs-on }}
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     concurrency:
       group: mirror-${{ github.repository }}
       cancel-in-progress: false
     steps:
-      - uses: Holo-Org/.github/actions/mirror@main
+      - name: Restore LFS objects
+        id: restore
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          destination: ${{ inputs.destination }}
-          ssh-key: ${{ secrets.MIRROR_SSH_KEY }}
-          branches: ${{ inputs.branches }}
-          tags: ${{ inputs.tags }}
-          prune: ${{ inputs.prune }}
-          lfs: ${{ inputs.lfs }}
-          dry-run: ${{ inputs.dry-run }}
+          path: source.git/lfs/objects
+          key: mirror-lfs-${{ github.run_id }}
+          restore-keys: mirror-lfs-
+
+      - name: Mirror branches, tags and LFS objects
+        id: mirror
+        env:
+          DESTINATION: ${{ inputs.destination }}
+          SSH_KEY: ${{ secrets.MIRROR_SSH_KEY }}
+          TOKEN: ${{ github.token }}
+        run: |
+          if [ -z "$SSH_KEY" ]; then
+            echo "::error::MIRROR_SSH_KEY is not available to this repository."
+            exit 1
+          fi
+          eval "$(ssh-agent -s)"
+          ssh-add - <<<"$SSH_KEY"
+
+          refspecs=('+refs/heads/*:refs/heads/*' '+refs/tags/*:refs/tags/*')
+          git init --quiet --bare source.git
+          cd source.git
+          git remote add origin "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git"
+          git config "http.$GITHUB_SERVER_URL/.extraheader" \
+            "AUTHORIZATION: basic $(printf 'x-access-token:%s' "$TOKEN" | base64 -w0)"
+          git fetch --quiet origin "${refspecs[@]}"
+
+          # LFS objects go first, so no destination ref ever points at a missing one.
+          git lfs fetch --all origin
+          git lfs push --all "$DESTINATION"
+          git push --force --prune "$DESTINATION" "${refspecs[@]}"
+
+          if [ -n "$(ls -A lfs/objects 2>/dev/null)" ]; then
+            hash=$(find lfs/objects -type f -printf '%f\n' | sort | sha256sum | cut -c1-16)
+            echo "lfs-key=mirror-lfs-$hash" >>"$GITHUB_OUTPUT"
+          fi
+
+      - name: Save LFS objects
+        if: >-
+          steps.mirror.outputs.lfs-key != '' &&
+          steps.mirror.outputs.lfs-key != steps.restore.outputs.cache-matched-key
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: source.git/lfs/objects
+          key: ${{ steps.mirror.outputs.lfs-key }}

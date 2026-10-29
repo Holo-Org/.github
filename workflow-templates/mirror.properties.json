@@ -1,6 +1,6 @@
 {
   "name": "Mirror repository",
-  "description": "Mirror this repository's branches and tags to another Git remote over SSH. Does nothing until the MIRROR_URL repository variable is set.",
+  "description": "Mirror this repository's branches, tags and LFS objects to another GitHub repository over SSH. Does nothing until the MIRROR_URL repository variable is set.",
   "iconName": "octicon mirror",
   "categories": ["Automation"]
 }
