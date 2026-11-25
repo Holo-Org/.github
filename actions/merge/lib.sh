@@ -67,14 +67,14 @@ section() {
 
 # check_title <title> <pr-number> prints why the title is unacceptable and
 # returns 1, or prints the commit title and returns 0. The convention's limit
-# is 72 columns on the commit title, so the number is part of the measurement.
+# is 85 columns on the commit title, so the number is part of the measurement.
 check_title() {
 	local title="$1" number="$2" composed
 	composed="$title (#$number)"
 
-	if [ "${#composed}" -gt 72 ]; then
-		printf 'The commit title would be %d columns and the limit is 72, so the title is %d too long.\n' \
-			"${#composed}" "$((${#composed} - 72))"
+	if [ "${#composed}" -gt 85 ]; then
+		printf 'The commit title would be %d columns and the limit is 85, so the title is %d too long.\n' \
+			"${#composed}" "$((${#composed} - 85))"
 		return 1
 	fi
 	case "$title" in

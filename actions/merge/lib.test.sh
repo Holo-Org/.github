@@ -116,18 +116,18 @@ check 'issue: a bad reference returns one' 1 $?
 
 # --- the title -----------------------------------------------------------
 
-# The convention's limit is 72 columns on the commit title, so the pull
-# request number is part of the measurement. A flat 64-column rule on the
-# title alone would reject this one, whose commit title is only 71.
-long='module: a subject that is exactly sixty-five characters in length'
-check 'fixture: that title really is 65 characters' 65 "${#long}"
+# The convention's limit is 85 columns on the commit title, so the pull
+# request number is part of the measurement. A flat 77-column rule on the
+# title alone would reject this one, whose commit title is only 84.
+long='module: a subject of precisely seventy-eight characters, counted with the area'
+check 'fixture: that title really is 78 characters' 78 "${#long}"
 
-check 'title: 65 characters is fine with a two-digit number' \
+check 'title: 78 characters is fine with a two-digit number' \
 	"$long (#53)" \
 	"$(check_title "$long" 53)"
 
 check 'title: the same title is one too long with a four-digit number' \
-	'The commit title would be 73 columns and the limit is 72, so the title is 1 too long.' \
+	'The commit title would be 86 columns and the limit is 85, so the title is 1 too long.' \
 	"$(check_title "$long" 1234)"
 
 check 'title: a double space is refused' 'The title contains a double space.' \
