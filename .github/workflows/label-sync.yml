@@ -1,0 +1,73 @@
+name: Label sync
+
+on:
+  workflow_call:
+    inputs:
+      dry-run:
+        description: Report what would change without changing it.
+        type: boolean
+        required: false
+        default: false
+
+permissions: {}
+
+concurrency:
+  group: label-sync-${{ github.repository }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  sync:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Check out the calling repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Check out the organisation's label vocabulary
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: Holo-Org/.github
+          path: .org
+          sparse-checkout: planning
+          sparse-checkout-cone-mode: false
+
+      - name: Compose this repository's label set
+        run: |
+          set -euo pipefail
+
+          # The shared labels are identical everywhere; the components are this
+          # repository's own. A repository that declares none still gets the
+          # shared set, the two shared components included.
+          own=.github/labels.yml
+          if [ ! -f "$own" ]; then
+            own="$RUNNER_TEMP/no-components.yml"
+            printf 'components: {}\n' >"$own"
+          fi
+
+          # The names after $ below are yq's own bindings, not shell variables.
+          # shellcheck disable=SC2016
+          yq ea '
+            (select(fi == 0) | .shared) as $shared
+            | (select(fi == 0) | .component_color) as $colour
+            | (select(fi == 1) | .components // {}) as $own
+            | $shared + ($own | to_entries | map({
+                "name": "component: " + .key,
+                "color": $colour,
+                "description": .value
+              }))
+          ' .org/planning/labels.yml "$own" >"$RUNNER_TEMP/labels.yml"
+
+          printf 'composed %s labels\n' "$(yq -r 'length' "$RUNNER_TEMP/labels.yml")"
+          yq -r '.[] | "  " + .name' "$RUNNER_TEMP/labels.yml"
+
+      - name: Apply it
+        uses: crazy-max/ghaction-github-labeler@548a7c3603594ec17c819e1239f281a3b801ab4d # v6.0.0
+        with:
+          yaml-file: ${{ runner.temp }}/labels.yml
+          dry-run: ${{ inputs.dry-run }}

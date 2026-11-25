@@ -1,0 +1,42 @@
+# The organisation's closed vocabularies. The lints check against this file, so
+# extending a vocabulary means editing it here rather than inventing a value.
+
+# Branch name: <kind>/<component>/<short-slug>. The kind says what sort of
+# change it is, which the commit title does not carry; the component is a
+# "component:" label value from the repository's own .github/labels.yml,
+# lowercased.
+#
+# A kind is not a commit area. The area in a commit title is finer and open:
+# reuse whatever the log already uses.
+branch_kinds:
+  - feat      # a new capability
+  - fix       # a defect repaired
+  - docs      # documentation only
+  - build     # build system, packaging, toolchain
+  - ci        # workflows and automation
+  - refactor  # internal structure, behaviour unchanged
+  - cleanup   # clutter removed, nothing else
+  - perf      # measurably faster, lighter or cheaper
+  - test      # tests added or reworked
+  - deps      # dependencies moved
+
+# A milestone title begins with its kind, because the two fail in opposite
+# directions.
+milestone_kinds:
+  - Defence   # a school defence; the date cannot move, so cut scope instead
+  - Release   # a major release; the date may move, the scope is the point
+
+# Hierarchy levels, in order, and the issue-template title prefix that each one
+# is created with. A markdown template cannot set an issue field, so the prefix
+# is what tells the automation which level to set.
+hierarchy:
+  - level: Initiative
+    prefix: "[Initiative]: "
+  - level: Epic
+    prefix: "[Epic]: "
+  - level: Feature
+    prefix: "[Feature]: "
+  - level: Story
+    prefix: "[Story]: "
+  - level: Task
+    prefix: "[Task]: "

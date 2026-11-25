@@ -1,0 +1,51 @@
+# The labels every repository carries, whatever it is for. A workflow applies
+# this file together with the repository's own .github/labels.yml, which holds
+# that repository's components and is the only one you need to touch day to day.
+#
+# GitHub's organisation-level default labels cover a repository the moment it is
+# created and are never linked back afterwards, so this file is what keeps them
+# true. Set the org defaults from it once, and the sync handles the drift.
+
+shared:
+  - name: "release: major"
+    color: CF222E
+    description: Breaking changes requiring a major version bump (x.0.0)
+  - name: "release: minor"
+    color: 1A7F37
+    description: New features requiring a minor version bump (0.x.0)
+  - name: "release: patch"
+    color: 9A6700
+    description: Bug fixes and small improvements requiring a patch version bump (0.0.x)
+
+  - name: "acting: reporter"
+    color: 6E011A
+    description: Waiting on whoever filed it for something nobody else knows
+  - name: "acting: maintainer"
+    color: D4C5F9
+    description: Needs classifying or deciding before anyone can start
+  - name: "acting: agent"
+    color: "116329"
+    description: Fully specified; a fresh agent session can take it as written
+  - name: "acting: human"
+    color: 0550AE
+    description: "Needs a person: implementation, design, or judgement an agent should not make"
+
+  # Present everywhere, so they live here rather than in each repository's file.
+  # uncategorized is deliberately a different colour from a real component: it
+  # means nobody has looked yet.
+  - name: "component: Setup"
+    color: A78BFA
+    description: Nix, workflows, Pages, templates and other repository scaffolding
+  - name: "component: uncategorized"
+    color: 9CA3AF
+    description: Needs categorisation; not a component
+
+  - name: "external: first-issue"
+    color: 1D76DB
+    description: Work that can be picked up by newcomers
+  - name: "external: help-wanted"
+    color: 0E8A16
+    description: Extra attention is needed
+
+# Every component label in a repository's own file takes this colour.
+component_color: A78BFA

@@ -1,0 +1,31 @@
+name: Extra deliverable
+description: Scope nobody asked for, offered anyway.
+type: Extra Deliverable
+labels: ["acting: maintainer"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What it adds
+      description: The addition, and what it would be worth having.
+    validations:
+      required: true
+
+  - type: textarea
+    id: outside
+    attributes:
+      label: Why it is outside the original scope
+      description: >-
+        What the project committed to, and where this sits relative to it. An
+        extra deliverable is judged separately from required work, so this is
+        the part that matters.
+    validations:
+      required: true
+
+  - type: textarea
+    id: cost
+    attributes:
+      label: What it costs
+      description: >-
+        Effort, new dependencies, and anything it would commit the project to
+        maintaining afterwards.

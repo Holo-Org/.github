@@ -1,0 +1,50 @@
+name: Bug
+description: Something is broken.
+type: Bug
+labels: ["acting: maintainer"]
+body:
+  - type: textarea
+    id: what-happens
+    attributes:
+      label: What happens
+      description: What you did, what happened, and what you expected instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Smallest case that still shows it
+      description: >-
+        Commands, input or a snippet. The smaller this is, the sooner it gets
+        fixed.
+      render: shell
+    validations:
+      required: true
+
+  - type: dropdown
+    id: regression
+    attributes:
+      label: Did this work before?
+      description: >-
+        This sets the issue's Origin field, which decides whether anyone goes
+        looking for what broke it.
+      options:
+        - It used to work and broke
+        - It never worked as far as I know
+        - It was already broken before recent changes
+        - I do not know
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: A tag, a commit, or the output of the project's version command.
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Platform, toolchain and configuration, where they could matter.

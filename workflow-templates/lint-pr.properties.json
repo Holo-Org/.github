@@ -1,0 +1,6 @@
+{
+  "name": "Lint a pull request",
+  "description": "Checks the title, branch name, component labels and the sections /merge parses, and reports them in one comment it edits in place.",
+  "iconName": "octicon checklist",
+  "categories": ["Automation"]
+}

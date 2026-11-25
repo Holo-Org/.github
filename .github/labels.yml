@@ -1,0 +1,12 @@
+# This repository's components. The key becomes "component: <key>"; the shared
+# labels and the colour come from Holo-Org/.github's planning/labels.yml.
+#
+# A component is the area of the code a change touches. It is coarse and closed:
+# one of these, or the change belongs somewhere else. It is not the same thing
+# as the area in a commit title, which is finer and open.
+components:
+  Merge: The /merge command and its action
+  Mirror: The mirroring workflow
+  Planning: Templates, label and project automation, planning docs
+  Rulesets: Ruleset definitions
+  Documentation: README and docs/
