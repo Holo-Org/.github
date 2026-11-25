@@ -83,7 +83,7 @@ pull request — including its own.
 | The commenter lacks write access | Checked with the collaborator permission API, not `author_association`, which reports membership rather than whether somebody may push |
 | The pull request is closed, a draft, or has conflicts | Nothing to merge |
 | It belongs to a GitHub stack | Merging one layer merges the whole stack and gives every commit this one's message. See [`automation-bot.md`](automation-bot.md) |
-| The commit title would exceed 72 columns | The convention's limit, measured on the title GitHub will store, `(#n)` included |
+| The commit title would exceed 85 columns | The convention's limit, measured on the title GitHub will store, `(#n)` included. The same `check_title` is what the pull request lint calls, so the two cannot disagree |
 | The title is not `<area>: <subject>`, has a double space, or does not end in a letter or digit | The commit convention |
 | A check has not finished, or did not pass | The bot's own rule, the same in every repository whatever its rulesets say |
 | `## Summary` is empty | It becomes the commit body |
@@ -165,6 +165,16 @@ status that never turns green will block every merge in that repository.
   which is the only one that will touch a stack, merges every layer at once and
   puts the one supplied message on every resulting commit. A chain of ordinary
   pull requests is not a stack and merges normally.
+
+  **This is probably out of date.** GitHub now documents that `merge-async`
+  *"includes all open downstack pull requests"* — so a call on the lowest layer
+  should include no other — that bypass works on *"the lowest unmerged pull
+  request in a stack"*, and that the remaining layers are rebased automatically
+  once the bottom one merges. If that holds, `/merge` should refuse only a layer
+  that is not the bottom one. Two things stay undocumented, so the refusal
+  stands until they are measured here: whether an app installation token counts
+  as the bypass actor, and whether the automatic rebase finishes before the next
+  call.
 - **A pull request whose own branch changes the command is awkward to test.**
   `issue_comment` fires for the copy of the workflow on the default branch, so
   a change to `/merge` itself cannot be exercised by commenting on the pull

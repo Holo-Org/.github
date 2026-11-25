@@ -1,17 +1,34 @@
 # Holo-Org/.github
 
-Shared GitHub Actions workflows and defaults for the Holo-Org organisation.
+Shared GitHub Actions workflows, templates and planning conventions for the
+Holo-Org organisation.
 
 ## Contents
 
 | Path | What it is |
 |---|---|
+| [`CONTRIBUTING.md`](CONTRIBUTING.md) | The organisation's default contributing guide, inherited by every repository without one |
+| [`.github/ISSUE_TEMPLATE`](.github/ISSUE_TEMPLATE) | The default issue forms and the five Agile templates, inherited the same way |
+| [`.github/PULL_REQUEST_TEMPLATE.md`](.github/PULL_REQUEST_TEMPLATE.md) | The default pull request template, whose headings `/merge` parses |
+| [`planning`](planning) | The label vocabulary and the closed vocabularies the lints check against |
+| [`.github/labels.yml`](.github/labels.yml) | This repository's own components, as every repository has |
 | [`.github/workflows/mirror.yml`](.github/workflows/mirror.yml) | Reusable workflow that mirrors a repository to another GitHub repository over SSH |
 | [`.github/workflows/merge.yml`](.github/workflows/merge.yml) | Reusable workflow behind the `/merge` command |
-| [`actions/merge`](actions/merge) | The composite action it calls, usable as a step on its own |
+| [`.github/workflows/label-sync.yml`](.github/workflows/label-sync.yml) | Reusable workflow that applies the label vocabulary to a repository |
+| [`.github/workflows/lint-pr.yml`](.github/workflows/lint-pr.yml) | Reusable workflow that checks a pull request against the conventions |
+| [`actions/merge`](actions/merge) | The composite action behind `/merge`, usable as a step on its own |
+| [`actions/lint-pr`](actions/lint-pr) | The composite action behind the pull request lint, which reuses the merge action's title rule |
 | [`workflow-templates`](workflow-templates) | Starter workflows offering the caller stubs from the Actions UI |
 | [`rulesets`](rulesets) | Ruleset definitions to apply to repositories in this organisation |
-| [`.github/workflows/ci.yml`](.github/workflows/ci.yml) | Lints this repository's own workflows, actions, shell and rulesets, and runs the actions' tests |
+| [`.github/workflows/ci.yml`](.github/workflows/ci.yml) | Lints this repository's own workflows, actions, shell, rulesets, templates and planning files, and runs the actions' tests |
+
+## Planning
+
+How work is described and scheduled — issue types and their fields, the
+hierarchy, milestones, and what the board shows — is in
+[docs/planning.md](docs/planning.md), with the label vocabulary in
+[docs/labels.md](docs/labels.md) and the automation in
+[docs/project-automation.md](docs/project-automation.md).
 
 ## Contributing
 
