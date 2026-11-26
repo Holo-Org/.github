@@ -197,3 +197,122 @@ jobs:
                             | select((has("actor_type") and has("bypass_mode")) | not)' "$rs")
           done
           exit "$status"
+
+      - name: Validate the planning vocabularies
+        run: |
+          set -euo pipefail
+          status=0
+
+          for f in planning/conventions.yml planning/labels.yml .github/labels.yml; do
+            if ! yq -e '.' "$f" >/dev/null 2>&1; then
+              echo "::error file=$f::not valid YAML"
+              status=1
+            fi
+          done
+          [ "$status" -eq 0 ] || exit 1
+
+          for key in branch_kinds milestone_kinds hierarchy; do
+            if [ "$(yq -r ".${key} // \"\" | length" planning/conventions.yml)" = 0 ]; then
+              echo "::error file=planning/conventions.yml::$key is missing or empty"
+              status=1
+            fi
+          done
+
+          # Every label needs all three fields, and a colour GitHub will take.
+          while IFS=$'\t' read -r name colour desc; do
+            [ -n "$name" ] || continue
+            if [ -z "$colour" ] || ! [[ $colour =~ ^[0-9A-Fa-f]{6}$ ]]; then
+              echo "::error file=planning/labels.yml::'$name' has colour '$colour', not six hex digits"
+              status=1
+            fi
+            if [ -z "$desc" ]; then
+              echo "::error file=planning/labels.yml::'$name' has no description"
+              status=1
+            fi
+          done < <(yq -r '.shared[] | [.name, (.color // ""), (.description // "")] | @tsv' planning/labels.yml)
+
+          if ! [[ $(yq -r '.component_color' planning/labels.yml) =~ ^[0-9A-Fa-f]{6}$ ]]; then
+            echo "::error file=planning/labels.yml::component_color is not six hex digits"
+            status=1
+          fi
+
+          exit "$status"
+
+      - name: Validate the issue and pull request templates
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          status=0
+
+          # A label an org-default template applies has to exist in this
+          # repository as well as the target's, so it must be one we ship.
+          known=$(yq -r '.shared[].name' planning/labels.yml)
+
+          check_labels() {
+            local file="$1" label
+            while IFS= read -r label; do
+              [ -n "$label" ] || continue
+              if ! grep -qxF -- "$label" <<<"$known"; then
+                echo "::error file=$file::applies '$label', which planning/labels.yml does not define"
+                status=1
+              fi
+            done
+          }
+
+          for f in .github/ISSUE_TEMPLATE/*.yml; do
+            [ "$(basename "$f")" = config.yml ] && continue
+            if ! yq -e '.' "$f" >/dev/null 2>&1; then
+              echo "::error file=$f::not valid YAML"
+              status=1
+              continue
+            fi
+            for key in name description body; do
+              if [ "$(yq -r ".${key} // \"\" | length" "$f")" = 0 ]; then
+                echo "::error file=$f::$key is missing or empty"
+                status=1
+              fi
+            done
+            check_labels "$f" < <(yq -r '.labels // [] | .[]' "$f")
+          done
+
+          # A markdown template's frontmatter is the part before the second ---.
+          for f in .github/ISSUE_TEMPLATE/*.md; do
+            front=$(awk '/^---$/{n++; next} n==1' "$f")
+            if ! yq -e '.' <<<"$front" >/dev/null 2>&1; then
+              echo "::error file=$f::frontmatter is not valid YAML"
+              status=1
+              continue
+            fi
+            for key in name about title type; do
+              if [ "$(yq -r ".${key} // \"\"" <<<"$front" | wc -c)" -le 1 ]; then
+                echo "::error file=$f::$key is missing from the frontmatter"
+                status=1
+              fi
+            done
+            # The title prefix is how the automation learns the Hierarchy level,
+            # so a template whose prefix is not in conventions.yml is inert.
+            prefix=$(yq -r '.title' <<<"$front")
+            if ! prefix="$prefix" yq -e '.hierarchy[] | select(.prefix == strenv(prefix))' \
+              planning/conventions.yml >/dev/null 2>&1; then
+              echo "::error file=$f::title prefix '$prefix' is not a hierarchy prefix in planning/conventions.yml"
+              status=1
+            fi
+            check_labels "$f" < <(yq -r '.labels // "" | if type == "!!str" then [.] else . end | .[]' <<<"$front")
+          done
+
+          for f in .github/PULL_REQUEST_TEMPLATE.md; do
+            # /merge parses these two headings, so their absence breaks merging.
+            for heading in '## Summary' '## Related issue'; do
+              if ! grep -qxF -- "$heading" "$f"; then
+                echo "::error file=$f::'$heading' is missing, and /merge parses it"
+                status=1
+              fi
+            done
+          done
+
+          if [ ! -f .github/ISSUE_TEMPLATE/config.yml ]; then
+            echo "::error ::.github/ISSUE_TEMPLATE/config.yml is missing"
+            status=1
+          fi
+
+          exit "$status"

@@ -1,0 +1,7 @@
+{
+  "name": "Sync the organisation's labels",
+  "description": "Applies the organisation's shared labels plus this repository's own components from .github/labels.yml, reverting anything edited by hand.",
+  "iconName": "octicon tag",
+  "categories": ["Automation"],
+  "filePatterns": [".github/labels.yml$"]
+}

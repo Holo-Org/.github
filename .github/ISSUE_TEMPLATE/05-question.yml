@@ -1,0 +1,22 @@
+name: Question
+description: Something is unclear, or a decision needs settling.
+type: Question
+labels: ["acting: maintainer"]
+body:
+  - type: textarea
+    id: question
+    attributes:
+      label: The question
+      description: >-
+        One question, stated so that an answer would close this issue.
+    validations:
+      required: true
+
+  - type: textarea
+    id: already-know
+    attributes:
+      label: What you have already established
+      description: >-
+        What you read, tried or ruled out. It stops the answer repeating what
+        you know, and it is the start of the record if this turns into a
+        decision.

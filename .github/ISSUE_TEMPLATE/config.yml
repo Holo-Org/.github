@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: How planning works here
+    url: https://github.com/Holo-Org/.github/blob/main/docs/planning.md
+    about: What the issue types mean, how work is scheduled, and what the board shows.
+  - name: How to contribute a change
+    url: https://github.com/Holo-Org/.github/blob/main/CONTRIBUTING.md
+    about: Branches, commit messages, pull requests and merging.

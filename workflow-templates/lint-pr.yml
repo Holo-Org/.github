@@ -1,0 +1,9 @@
+name: Conventions
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize, labeled, unlabeled]
+
+jobs:
+  lint:
+    uses: Holo-Org/.github/.github/workflows/lint-pr.yml@main

@@ -1,0 +1,29 @@
+name: Lint a pull request
+description: >-
+  Checks a pull request against the organisation's conventions — its title, its
+  branch name, its component labels and the sections the merge command parses —
+  and reports every failure in one comment it edits in place.
+
+inputs:
+  token:
+    description: >-
+      Token used to read the pull request and to write the report comment.
+      GITHUB_TOKEN with pull-requests write is enough. On a pull request from a
+      fork the token is read-only, so the report falls back to the job summary.
+    required: false
+    default: ${{ github.token }}
+  pull-request:
+    description: Number of the pull request to check.
+    required: false
+    default: ${{ github.event.pull_request.number }}
+
+runs:
+  using: composite
+  steps:
+    - name: Check the pull request
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+        GH_REPO: ${{ github.repository }}
+        PR: ${{ inputs.pull-request }}
+      run: bash "$GITHUB_ACTION_PATH/lint-pr.sh"

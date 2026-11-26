@@ -1,0 +1,14 @@
+name: Project
+
+on:
+  issues:
+    types: [opened, edited, reopened, closed, assigned, unassigned, labeled, unlabeled]
+  pull_request:
+    types: [opened, reopened, closed, ready_for_review, converted_to_draft, synchronize]
+  pull_request_review:
+    types: [submitted, dismissed]
+
+jobs:
+  sync:
+    uses: Holo-Org/.github/.github/workflows/project-sync.yml@main
+    secrets: inherit

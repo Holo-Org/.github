@@ -1,0 +1,30 @@
+name: Documentation
+description: The documentation is wrong, missing or unclear.
+type: Documentation
+labels: ["acting: maintainer"]
+body:
+  - type: input
+    id: where
+    attributes:
+      label: Where
+      description: A link, a file path, or the heading you were reading.
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What it says, and what is wrong with it
+      description: >-
+        Whether it is wrong, missing, or correct but impossible to follow. What
+        you concluded, and what you should have concluded.
+    validations:
+      required: true
+
+  - type: textarea
+    id: looking-for
+    attributes:
+      label: What you were trying to do
+      description: >-
+        The task that sent you to the documentation. It often shows where the
+        gap really is.

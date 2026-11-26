@@ -1,0 +1,40 @@
+name: Build
+description: The project will not build, install or package.
+type: Build
+labels: ["acting: maintainer"]
+body:
+  - type: textarea
+    id: command
+    attributes:
+      label: What you ran
+      description: The exact command, from a clean checkout where possible.
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: output
+    attributes:
+      label: What it printed
+      description: The failure, with enough of the surrounding output to place it.
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: toolchain
+    attributes:
+      label: Platform and toolchain
+      description: >-
+        Operating system and version, compiler or interpreter, package manager,
+        and how you obtained them.
+    validations:
+      required: true
+
+  - type: textarea
+    id: packaging
+    attributes:
+      label: What you were trying to achieve
+      description: >-
+        Fill this in if you are packaging the project or adding it to a package
+        manager rather than building it to work on it.

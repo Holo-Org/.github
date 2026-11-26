@@ -1,0 +1,37 @@
+name: Project sync
+
+on:
+  workflow_call:
+    secrets:
+      PLANNING_APP_PRIVATE_KEY:
+        description: >-
+          Private key of the organisation's planning app. Its client id comes
+          from the PLANNING_APP_CLIENT_ID organisation variable, which a called
+          workflow reads for itself. This is a different app from the one behind
+          /merge, and deliberately holds no Contents permission.
+        required: true
+
+jobs:
+  sync:
+    runs-on: ubuntu-24.04
+    permissions: {}
+    concurrency:
+      # One at a time per item: two runs racing on the same card would both
+      # compute a Status and the later write would win arbitrarily.
+      group: project-sync-${{ github.repository }}-${{ github.event.issue.number || github.event.pull_request.number }}
+      cancel-in-progress: false
+    steps:
+      - name: Mint an app token
+        id: token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ vars.PLANNING_APP_CLIENT_ID }}
+          private-key: ${{ secrets.PLANNING_APP_PRIVATE_KEY }}
+
+      - name: Sync the item to the board
+        uses: Holo-Org/.github/actions/project-sync@main
+        with:
+          token: ${{ steps.token.outputs.token }}
+          kind: ${{ github.event_name == 'issues' && 'issue' || 'pr' }}
+          number: ${{ github.event_name == 'issues' && github.event.issue.number || github.event.pull_request.number }}
+          project-url: ${{ vars.PROJECT_URL }}

@@ -1,0 +1,48 @@
+name: Improvement
+description: It works, but it should be better.
+type: Improvement
+labels: ["acting: maintainer"]
+body:
+  - type: textarea
+    id: today
+    attributes:
+      label: How it behaves today
+      description: What the current behaviour is, and where it falls short.
+    validations:
+      required: true
+
+  - type: textarea
+    id: better
+    attributes:
+      label: What better looks like
+      description: >-
+        The outcome, not the implementation. How anyone could tell afterwards
+        that it had improved.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: What kind of improvement
+      description: This sets the issue's Category field.
+      options:
+        - Performance — slower, heavier or less efficient than it could be
+        - Compatibility — differs across platforms, versions or configurations
+        - UI / UX — visual, interaction, layout or usability
+        - Refactor — internal structure, behaviour unchanged
+        - Cleanup — clutter removed, nothing else
+        - CI — pipelines, workflows or automation scripts
+        - Build — the tools used to build and work on the project
+        - Dependencies — make use of something a dependency now offers
+        - Tests — unit, integration, end-to-end, contract or fuzz
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence
+      description: >-
+        A measurement, a profile, a failing case, a screenshot. Anything that
+        turns an opinion into a fact.

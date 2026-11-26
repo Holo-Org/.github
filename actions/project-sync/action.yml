@@ -1,0 +1,37 @@
+name: Sync an item to the project board
+description: >-
+  Adds an Agile issue or a pull request to the repository's project board and
+  computes everything the board shows about it — its Status, its Hierarchy level
+  from the title prefix, its Start date, and its acting label.
+
+inputs:
+  token:
+    description: >-
+      Installation token for the organisation's planning app. GITHUB_TOKEN will
+      not do: it cannot access an organisation project at all.
+    required: true
+  kind:
+    description: Either `issue` or `pr`.
+    required: true
+  number:
+    description: Number of the issue or pull request.
+    required: true
+  project-url:
+    description: >-
+      The board to use. Left empty, the organisation project whose title matches
+      the repository name is used, and a repository with no board is skipped.
+    required: false
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    - name: Sync it
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+        GH_REPO: ${{ github.repository }}
+        KIND: ${{ inputs.kind }}
+        NUMBER: ${{ inputs.number }}
+        PROJECT_URL: ${{ inputs.project-url }}
+      run: bash "$GITHUB_ACTION_PATH/sync.sh"

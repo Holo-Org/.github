@@ -1,0 +1,6 @@
+{
+  "name": "Sync the project board",
+  "description": "Adds Agile issues and pull requests to the repository's board and computes their Status, Hierarchy level, Start date and acting label.",
+  "iconName": "octicon project",
+  "categories": ["Automation"]
+}

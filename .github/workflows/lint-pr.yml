@@ -1,0 +1,32 @@
+name: Pull request lint
+
+on:
+  workflow_call:
+    inputs:
+      pull-request:
+        description: Pull request to check. Defaults to the one that triggered the run.
+        type: string
+        required: false
+        default: ''
+
+permissions: {}
+
+concurrency:
+  group: lint-pr-${{ github.repository }}-${{ inputs.pull-request || github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: write
+    steps:
+      # The action reads the organisation's conventions from its own checkout
+      # and this repository's components over the API, so nothing needs
+      # checking out here.
+      - name: Check the pull request against the conventions
+        uses: Holo-Org/.github/actions/lint-pr@main
+        with:
+          pull-request: ${{ inputs.pull-request || github.event.pull_request.number }}
