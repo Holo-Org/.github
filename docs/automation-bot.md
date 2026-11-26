@@ -12,12 +12,10 @@ than to a workflow run, or when its effects must trigger further workflows.
 | Installation ID | `98599516` (organisation-wide, all repositories) |
 | Private key | The organisation secret `MERGE_APP_PRIVATE_KEY` |
 
-The two identifiers are **variables**, not secrets: neither is confidential —
-both are readable from `GET /apps/{app_slug}` by anyone — and a variable is not
-masked in logs, so a failing run shows which app it tried to authenticate as
-rather than `***`. Only the private key is a secret, and it is the only one of
-the three that grants anything. All three are organisation-wide, so a workflow
-in any repository here can reach them.
+The two identifiers are **variables**, not secrets: both are readable from
+`GET /apps/{app_slug}` by anyone, and a variable is not masked in logs, so a
+failing run names the app it tried to authenticate as rather than `***`. Only
+the private key grants anything. All three are organisation-wide.
 
 Mint a token with
 [`actions/create-github-app-token`](https://github.com/actions/create-github-app-token):
@@ -30,21 +28,14 @@ Mint a token with
     private-key: ${{ secrets.MERGE_APP_PRIVATE_KEY }}
 ```
 
-Pass the client ID through `client-id`. The `app-id` input still works, and
-`vars.MERGE_APP_ID` is kept for anything that needs the numeric form — the
-ruleset bypass lists do — but the action has deprecated that input and a run
-using it logs a warning.
+Pass the client ID through `client-id`; the `app-id` input is deprecated and
+logs a warning, though `vars.MERGE_APP_ID` is kept for the numeric form that
+ruleset bypass lists need.
 
 **A reusable workflow here can read these directly.** There is no
-`vars: inherit` to match `secrets: inherit`, so it is worth saying that none is
-needed: `vars` resolves inside a `workflow_call` workflow, verified on
-2026-10-28. A shared workflow in this repository therefore reads
-`vars.MERGE_APP_CLIENT_ID` itself and needs no input for it, while the private
-key still has to arrive through `secrets: inherit` or an explicit `secrets:`
-block. The check was run with caller and callee in this repository, so it does
-not distinguish whether `vars` resolves against the caller or the callee — a
-distinction that does not matter while these are organisation variables visible
-to every repository.
+`vars: inherit` to match `secrets: inherit`, and none is needed: `vars` resolves
+inside a `workflow_call` workflow, verified on 2026-10-28. The private key still
+has to arrive through `secrets: inherit` or an explicit `secrets:` block.
 
 ## Why an app at all
 
@@ -143,13 +134,11 @@ and against the squash commits already on R-Type's `main`, which the merge
 button produced: identical in shape — author preserved, committer `GitHub`,
 signature valid. Merging through the app is no regression on that front.
 
-Be precise about what the badge attests, though. The signature is **GitHub's**,
-not the author's: it says GitHub built this commit through an authenticated API
-call, not that the person named as author signed anything. A commit you make
-locally and sign yourself carries a different and stronger claim. Nothing is
-lost by merging through the app, because the merge button's commits were already
-GitHub-signed — but a squash commit's signature has never attested to the
-author's own key, and still does not.
+Be precise about what the badge attests. The signature is **GitHub's**, not the
+author's: it says GitHub built this commit through an authenticated API call,
+not that the person named as author signed anything. Nothing is lost by merging
+through the app, since the merge button's commits were already GitHub-signed —
+but a squash commit's signature has never attested to the author's own key.
 
 Because these commits are signed, a `required_signatures` rule on the default
 branch is satisfiable: squash merges are the only commits that land there, and
@@ -225,8 +214,64 @@ on 2026-10-29, with a two-pull-request stack whose base branch carried the lock:
 
 `gh stack merge` *can* merge up to a chosen layer, but it states that "bypassing
 merge requirements is not supported for stacks", so it cannot write to a locked
-branch. There is therefore no way, on a locked default branch, to merge one
-layer of a registered stack with a commit message of its own.
+branch.
+
+### What the documentation establishes
+
+From the stacked-pull-request reference, the merging how-to and the merge-async
+reference, read on 2026-10-21 and re-checked on 2026-11-25:
+
+1. **Merging is bottom-up and cumulative.** "You cannot merge a mid-stack pull
+   request in isolation, the pull requests below it will always merge with it."
+   The merge-async description agrees: the operation "includes all open downstack
+   pull requests". So a call on the *lowest* unmerged pull request includes no
+   other, because nothing is below it.
+2. **Squash gives one commit per pull request** — "merging `n` pull requests
+   creates `n` squashed commits".
+3. **Bypass works on the bottom layer only.** "Stacked pull requests support
+   merging with bypass rules, but only the bottom pull request can be merged this
+   way."
+4. **The layers above are rebased for you.** "After the merge, the next unmerged
+   pull request is automatically rebased to target the stack base directly." No
+   timing is given.
+5. **Which message each of `n` commits gets is not documented.** Supplying one
+   `commit_title` for a multi-layer merge has undefined behaviour.
+6. **Atomicity is self-contradictory in the docs.** The APIs page calls a stack
+   merge atomic; the troubleshooting page says a part-way failure leaves the
+   layers that merged "landed on the base branch". Both are current.
+
+**Finding 2 of the experiment above therefore disagrees with point 1**, which
+says a call on the bottom layer should land one commit. Either the pull request
+targeted on 2026-10-29 was not the lowest unmerged one, or the behaviour
+changed. Re-measure before rewriting `/merge`.
+
+### Rules for a bot that merges stacks
+
+Read `stack` on the pull request — `null` for a standalone one, otherwise
+carrying `position`, `size` and `base.ref` — and then:
+
+- **Refuse unless `position` is 1.** From a mid-stack merge GitHub lands every
+  layer below, and the composed message belongs to only one of them. Point 5
+  makes the result undefined; merging one layer at a time, bottom first, avoids
+  the question entirely, because only one pull request is then open.
+- **Send `merge_action: direct_merge` explicitly.** With `default`, an
+  administrator enabling a merge queue later flips the request onto the path
+  where `commit_title` and `commit_message` are documented as unsupported.
+- **Do not reuse a captured head SHA across layers.** The automatic rebase
+  changes it, and point 4 gives no timing — re-read `base.ref`, `position` and
+  the head before a second merge.
+- **Treat `409` as a duplicate, not a failure.** It returns the pending
+  request's `uuid` and its merge options; poll that. A second call's own options
+  may or may not be stored, which is not documented.
+- **Refuse when `base.ref` is not the branch you meant to merge into** — the
+  default branch, or the stack's own base for a position-1 member.
+- **Classic retargeting fires on the head branch being *deleted*,** not on the
+  merge. For an unlinked chain, squash-merging the parent leaves the child's
+  branch holding the original commits, and GitHub documents no interaction
+  between squash and retargeting for that case.
+
+`merge-async` and its polling `GET` both require **Contents: write** for a
+GitHub App — the polling endpoint is write, not read.
 
 **A chain of pull requests is not a stack.** A pull request whose base is
 another pull request's head has `stack: null` unless somebody registered it with

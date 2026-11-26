@@ -92,10 +92,9 @@ directly. What it buys is that nothing *else* can arrive there unsigned.
 
 **Code-owner review is required, and that costs nothing.** Without a
 `CODEOWNERS` file the rule has no owners to demand a review from, so it is
-inert; R-Type has carried it with no `CODEOWNERS` since 2026-10-15 and every
+inert — R-Type has carried it with no `CODEOWNERS` since 2026-10-15 and every
 pull request since has merged. Leaving it on means a repository that later adds
-a `CODEOWNERS` file gets the enforcement without anybody remembering to turn the
-rule on.
+`CODEOWNERS` gets the enforcement without anybody remembering to turn it on.
 
 **Branches need not be up to date.** `strict_required_status_checks_policy` is
 `false`. Setting it `true` would force a rebase onto the default branch before

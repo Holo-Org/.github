@@ -6,20 +6,9 @@ to a GitHub repository over SSH, keeping the destination an exact copy.
 A repository mirrors only once a `MIRROR_URL` variable is set on it. Everywhere
 else the workflow is skipped, so the stub is safe to add anywhere.
 
-## One-time organisation setup
+## Rotating the key
 
-### 0. Make this repository callable
-
-If `Holo-Org/.github` is private, other repositories cannot call its reusable
-workflow until access is granted: **Settings → Actions → General → Access →
-Accessible from repositories in the 'Holo-Org' organisation**. That grant lets
-outside collaborators on those repositories reach this one indirectly, so keep
-it in mind before adding anything sensitive here.
-
-Starter workflows offered from a private `.github` repository are not something
-the current GitHub documentation confirms either way. If **Mirror repository**
-does not appear under **Actions → New workflow**, copy the stub below by hand;
-the reusable workflow itself is unaffected.
+The organisation secret is already set. These are the steps to set it again.
 
 ### 1. Choose the account the key belongs to
 
